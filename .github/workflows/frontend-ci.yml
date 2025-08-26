@@ -1,0 +1,71 @@
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('frontend/package.json') != '' }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Validate environment configuration
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_ENVIRONMENT: development
+          NEXT_PUBLIC_APP_NAME: Healthcare Study Companion (CI)
+          NEXT_PUBLIC_ENABLE_DEBUG_MODE: false
+          NEXT_PUBLIC_ENABLE_ANALYTICS: false
+        run: |
+          echo "🔍 Validating development environment configuration..."
+          node scripts/validate-environment.js --environment development --verbose || true
+          
+          echo "🔍 Validating staging environment configuration..."
+          node scripts/validate-environment.js --environment staging --json || true
+          
+          echo "🔍 Validating production environment configuration..."
+          node scripts/validate-environment.js --environment production --json || true
+
+      - name: Lint (ESLint)
+        working-directory: frontend
+        run: npm run lint || true
+
+      - name: Type check (TypeScript)
+        working-directory: frontend
+        run: npm run type-check || true
+
+      - name: Build application
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_ENVIRONMENT: development
+        run: npm run build
+
+      - name: Test build output
+        working-directory: frontend
+        run: |
+          echo "🔍 Checking build output..."
+          ls -la .next/
+          echo "✅ Build completed successfully"

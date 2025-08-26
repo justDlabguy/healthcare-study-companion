@@ -1,0 +1,166 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even if no changes detected'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_URL }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for better deployment tracking
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate production environment configuration
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+          ENVIRONMENT: production
+          LLM_PROVIDER: mistral
+          EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_EMAIL: ${{ vars.SMTP_FROM_EMAIL }}
+          LOG_LEVEL: INFO
+          STRUCTURED_LOGGING: true
+        run: |
+          echo "🔍 Validating production environment configuration..."
+          python scripts/validate_environment.py --environment production --strict --json
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Production environment validation failed!"
+            echo "Please fix configuration issues before deploying."
+            exit 1
+          fi
+          
+          echo "✅ Production environment validation passed"
+
+      - name: Validate migration state
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+        run: |
+          echo "🔍 Validating migration state before deployment..."
+          python scripts/migration_workflow.py validate
+
+      - name: Check for pending migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+        run: |
+          echo "📋 Checking for pending migrations..."
+          python scripts/manage_migrations.py current
+          python scripts/manage_migrations.py history
+
+      - name: Create pre-deployment backup
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+        run: |
+          echo "💾 Creating pre-deployment backup..."
+          python scripts/manage_migrations.py backup
+
+      - name: Deploy with migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+          RAILWAY_DEPLOYMENT_ID: ${{ github.run_id }}
+          RAILWAY_GIT_COMMIT_SHA: ${{ github.sha }}
+          AUTO_ROLLBACK_ON_FAILURE: 'true'
+        run: |
+          echo "🚀 Starting production deployment with migrations..."
+          python scripts/deploy.py
+
+      - name: Verify deployment
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+        run: |
+          echo "✅ Verifying deployment success..."
+          python scripts/migration_workflow.py status
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "🎉 Production deployment completed successfully!"
+          echo "Commit: ${{ github.sha }}"
+          echo "Run ID: ${{ github.run_id }}"
+
+      - name: Handle deployment failure
+        if: failure()
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          ENVIRONMENT: production
+        run: |
+          echo "❌ Production deployment failed!"
+          echo "Checking rollback options..."
+          python scripts/rollback_migrations.py status
+          
+          # The deploy.py script should have already attempted auto-rollback
+          # if AUTO_ROLLBACK_ON_FAILURE was set to 'true'
+          echo "Check deployment logs for rollback status"
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Notify deployment result
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Production deployment successful"
+          else
+            echo "❌ Production deployment failed"
+            echo "Please check the deployment logs and consider manual intervention"
+          fi

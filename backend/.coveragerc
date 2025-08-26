@@ -1,0 +1,53 @@
+[run]
+# Configuration for coverage.py
+source = app
+omit = 
+    */tests/*
+    */test_*
+    */conftest.py
+    */venv/*
+    */__pycache__/*
+    */migrations/*
+    */alembic/*
+    */scripts/*
+    app/main.py
+    app/config.py
+
+# Enable branch coverage
+branch = True
+
+# Parallel processing support
+parallel = True
+
+[report]
+# Reporting options
+precision = 2
+show_missing = True
+skip_covered = False
+skip_empty = False
+
+# Exclude lines from coverage
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+[html]
+# HTML report configuration
+directory = htmlcov
+title = Healthcare Study Companion - Backend Coverage Report
+
+[xml]
+# XML report for CI/CD integration
+output = coverage.xml
+
+[json]
+# JSON report for programmatic access
+output = coverage.json

@@ -1,0 +1,322 @@
+name: Validate All Environments
+
+on:
+  # Run daily at 6 AM UTC to catch configuration drift
+  schedule:
+    - cron: '0 6 * * *'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to validate (all, development, staging, production)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - development
+          - staging
+          - production
+      strict_mode:
+        description: 'Enable strict mode (fail on warnings)'
+        required: false
+        default: true
+        type: boolean
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+  # Run on changes to environment files or validation scripts
+  push:
+    paths:
+      - 'backend/.env.*'
+      - 'frontend/.env.*'
+      - 'backend/scripts/validate_environment.py'
+      - 'frontend/scripts/validate-environment.js'
+      - 'scripts/validate-all-environments.*'
+      - '.github/workflows/validate-environments.yml'
+
+  pull_request:
+    paths:
+      - 'backend/.env.*'
+      - 'frontend/.env.*'
+      - 'backend/scripts/validate_environment.py'
+      - 'frontend/scripts/validate-environment.js'
+      - 'scripts/validate-all-environments.*'
+
+jobs:
+  validate-backend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [development, staging, production]
+      fail-fast: false
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate backend environment - ${{ matrix.environment }}
+        working-directory: backend
+        env:
+          # Development environment variables
+          DATABASE_URL: ${{ matrix.environment == 'development' && 'mysql+pymysql://root:password@localhost:3306/healthcare_study_dev' || '' }}
+          JWT_SECRET: ${{ matrix.environment == 'development' && 'dev-secret-key-change-me-in-production' || secrets.JWT_SECRET }}
+          MISTRAL_API_KEY: ${{ matrix.environment == 'development' && 'test_api_key' || secrets.MISTRAL_API_KEY }}
+          CORS_ORIGINS: ${{ matrix.environment == 'development' && 'http://localhost:3000' || vars.CORS_ORIGINS }}
+          
+          # Staging/Production environment variables (from secrets/vars)
+          PRODUCTION_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          
+          # Common environment variables
+          ENVIRONMENT: ${{ matrix.environment }}
+          LLM_PROVIDER: mistral
+          EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_EMAIL: ${{ vars.SMTP_FROM_EMAIL }}
+          LOG_LEVEL: ${{ matrix.environment == 'development' && 'DEBUG' || 'INFO' }}
+          STRUCTURED_LOGGING: ${{ matrix.environment == 'development' && 'false' || 'true' }}
+        run: |
+          # Set environment-specific DATABASE_URL
+          if [ "${{ matrix.environment }}" == "staging" ] && [ -n "$STAGING_DATABASE_URL" ]; then
+            export DATABASE_URL="$STAGING_DATABASE_URL"
+          elif [ "${{ matrix.environment }}" == "production" ] && [ -n "$PRODUCTION_DATABASE_URL" ]; then
+            export DATABASE_URL="$PRODUCTION_DATABASE_URL"
+          fi
+          
+          echo "🔍 Validating backend ${{ matrix.environment }} environment..."
+          
+          # Determine validation flags
+          VALIDATION_FLAGS="--environment ${{ matrix.environment }}"
+          
+          if [ "${{ github.event.inputs.strict_mode }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --strict"
+          fi
+          
+          if [ "${{ github.event.inputs.verbose }}" == "true" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --verbose"
+          fi
+          
+          # Skip if specific environment requested and this isn't it
+          if [ "${{ github.event.inputs.environment }}" != "all" ] && [ "${{ github.event.inputs.environment }}" != "${{ matrix.environment }}" ]; then
+            echo "⏭️ Skipping ${{ matrix.environment }} (not requested)"
+            exit 0
+          fi
+          
+          python scripts/validate_environment.py $VALIDATION_FLAGS
+
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-validation-${{ matrix.environment }}
+          path: backend/validation-results.json
+          retention-days: 7
+
+  validate-frontend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [development, staging, production]
+      fail-fast: false
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Validate frontend environment - ${{ matrix.environment }}
+        working-directory: frontend
+        env:
+          # Environment-specific API URLs
+          NEXT_PUBLIC_API_URL: ${{ 
+            matrix.environment == 'development' && 'http://localhost:8000' ||
+            matrix.environment == 'staging' && vars.STAGING_API_URL ||
+            vars.PRODUCTION_API_URL
+          }}
+          
+          # Common environment variables
+          NEXT_PUBLIC_ENVIRONMENT: ${{ matrix.environment }}
+          NEXT_PUBLIC_APP_NAME: ${{ vars.APP_NAME || 'Healthcare Study Companion' }}
+          NEXT_PUBLIC_ENABLE_DEBUG_MODE: ${{ matrix.environment == 'development' && 'true' || 'false' }}
+          NEXT_PUBLIC_ENABLE_ANALYTICS: ${{ matrix.environment == 'development' && 'false' || 'true' }}
+          
+          # Analytics (optional)
+          NEXT_PUBLIC_GOOGLE_ANALYTICS_ID: ${{ vars.GOOGLE_ANALYTICS_ID }}
+          NEXT_PUBLIC_MIXPANEL_TOKEN: ${{ secrets.MIXPANEL_TOKEN }}
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          echo "🔍 Validating frontend ${{ matrix.environment }} environment..."
+          
+          # Determine validation flags
+          VALIDATION_FLAGS="--environment ${{ matrix.environment }}"
+          
+          if [ "${{ github.event.inputs.strict_mode }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --strict"
+          fi
+          
+          if [ "${{ github.event.inputs.verbose }}" == "true" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --verbose"
+          fi
+          
+          # Skip if specific environment requested and this isn't it
+          if [ "${{ github.event.inputs.environment }}" != "all" ] && [ "${{ github.event.inputs.environment }}" != "${{ matrix.environment }}" ]; then
+            echo "⏭️ Skipping ${{ matrix.environment }} (not requested)"
+            exit 0
+          fi
+          
+          node scripts/validate-environment.js $VALIDATION_FLAGS
+
+      - name: Upload validation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-validation-${{ matrix.environment }}
+          path: frontend/validation-results.json
+          retention-days: 7
+
+  comprehensive-validation:
+    runs-on: ubuntu-latest
+    needs: [validate-backend, validate-frontend]
+    if: always()
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run comprehensive validation
+        env:
+          # Development environment variables
+          DATABASE_URL: mysql+pymysql://root:password@localhost:3306/healthcare_study_dev
+          JWT_SECRET: dev-secret-key-change-me-in-production
+          MISTRAL_API_KEY: test_api_key
+          CORS_ORIGINS: http://localhost:3000
+          ENVIRONMENT: development
+          LLM_PROVIDER: mistral
+          
+          # Frontend environment variables
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_ENVIRONMENT: development
+          NEXT_PUBLIC_ENABLE_DEBUG_MODE: true
+          NEXT_PUBLIC_ENABLE_ANALYTICS: false
+        run: |
+          echo "🚀 Running comprehensive environment validation..."
+          
+          # Determine validation flags
+          VALIDATION_FLAGS=""
+          
+          if [ "${{ github.event.inputs.strict_mode }}" == "true" ] || [ "${{ github.event_name }}" == "schedule" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --strict"
+          fi
+          
+          if [ "${{ github.event.inputs.verbose }}" == "true" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --verbose"
+          fi
+          
+          if [ "${{ github.event.inputs.environment }}" != "all" ]; then
+            VALIDATION_FLAGS="$VALIDATION_FLAGS --environment ${{ github.event.inputs.environment }}"
+          fi
+          
+          # Run comprehensive validation script
+          chmod +x scripts/validate-all-environments.sh
+          ./scripts/validate-all-environments.sh $VALIDATION_FLAGS
+
+      - name: Generate validation report
+        if: always()
+        run: |
+          echo "📊 Environment Validation Report" > validation-report.md
+          echo "=================================" >> validation-report.md
+          echo "" >> validation-report.md
+          echo "**Workflow:** ${{ github.workflow }}" >> validation-report.md
+          echo "**Trigger:** ${{ github.event_name }}" >> validation-report.md
+          echo "**Commit:** ${{ github.sha }}" >> validation-report.md
+          echo "**Date:** $(date -u)" >> validation-report.md
+          echo "" >> validation-report.md
+          
+          if [ "${{ needs.validate-backend.result }}" == "success" ]; then
+            echo "✅ Backend validation: PASSED" >> validation-report.md
+          else
+            echo "❌ Backend validation: FAILED" >> validation-report.md
+          fi
+          
+          if [ "${{ needs.validate-frontend.result }}" == "success" ]; then
+            echo "✅ Frontend validation: PASSED" >> validation-report.md
+          else
+            echo "❌ Frontend validation: FAILED" >> validation-report.md
+          fi
+          
+          echo "" >> validation-report.md
+          echo "See workflow logs for detailed information." >> validation-report.md
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: validation-report.md
+          retention-days: 30
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: [validate-backend, validate-frontend, comprehensive-validation]
+    if: failure() && github.event_name == 'schedule'
+    
+    steps:
+      - name: Notify on validation failure
+        run: |
+          echo "❌ Scheduled environment validation failed!"
+          echo "This indicates potential configuration drift or issues."
+          echo "Please review the validation results and fix any issues."
+          echo ""
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Commit: ${{ github.sha }}"
+          
+          # In a real setup, you might want to send notifications to Slack, email, etc.
+          # For now, we'll just log the failure

@@ -1,0 +1,110 @@
+# General
+.DS_Store
+*.log
+
+# Environment files (sensitive)
+.env
+.env.*
+!.env.example
+local.env
+
+# Database files (sensitive)
+*.db
+*.sqlite
+*.sqlite3
+dev.db
+
+# API Keys and secrets (sensitive)
+jwt_gen.py
+*secret*
+*key*
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.dist/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+.pytest_cache/
+pytest_cache/
+
+# Build artifacts
+/dist/
+/build/
+
+# Development and testing files
+*test*.js
+*test*.py
+test-*.js
+test-*.py
+debug_*.py
+check_*.py
+comprehensive_*.py
+*_test.py
+test.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and backups
+logs/
+backups/
+*.log
+*.bak
+
+# Upload directories (may contain sensitive user data)
+uploads/
+/backend/uploads/
+
+# Cache directories
+.cache/
+*.cache
+
+# OS generated files
+Thumbs.db
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Migration test files and random files
+1.12.0
+bfaa6c8f6dc8
+python
+CLI_cmds.txt
+
+# Development documentation that shouldn't be in production
+*_SUMMARY.md
+*_FIXES.md
+*_IMPROVEMENTS.md
+FLASHCARD_IMPLEMENTATION_SUMMARY.md
+RESPONSIVE_DESIGN_IMPROVEMENTS.md
+TOAST_FIXES.md
+
+# Test directories
+kiro_test_file/
+IDE_TESTS/

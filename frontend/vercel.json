@@ -10,6 +10,14 @@
       "maxDuration": 30
     }
   },
+  "env": {
+    "NEXT_PUBLIC_ENVIRONMENT": "production"
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_ENVIRONMENT": "production"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

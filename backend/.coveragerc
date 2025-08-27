@@ -1,7 +1,7 @@
 [run]
 # Configuration for coverage.py
 source = app
-omit = 
+omit =
     */tests/*
     */test_*
     */conftest.py

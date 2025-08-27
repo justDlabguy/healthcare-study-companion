@@ -3,30 +3,30 @@ name: Deploy Frontend to Vercel
 on:
   push:
     branches: [main]
-    paths: ['frontend/**']
+    paths: ["frontend/**"]
   pull_request:
     branches: [main]
-    paths: ['frontend/**']
+    paths: ["frontend/**"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
-          
+
       - name: Install dependencies
         run: npm ci
         working-directory: frontend
-        
+
       - name: Validate environment configuration
         run: npm run validate:env production
         working-directory: frontend
@@ -34,7 +34,7 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_ENVIRONMENT: production
           NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
-          
+
       - name: Run type checking
         run: npm run type-check
         working-directory: frontend
@@ -42,12 +42,12 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_ENVIRONMENT: production
           NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
-          
+
       - name: Run linting
         run: npm run lint
         working-directory: frontend
         continue-on-error: true # Allow deployment even with lint warnings
-        
+
       - name: Build application
         run: npm run build
         working-directory: frontend
@@ -57,12 +57,12 @@ jobs:
           NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
           NEXT_PUBLIC_ENABLE_DEBUG_MODE: false
           NEXT_PUBLIC_ENABLE_ANALYTICS: true
-          
+
       - name: Test backend connectivity (if available)
         run: npm run test:connectivity ${{ secrets.NEXT_PUBLIC_API_URL }}
         working-directory: frontend
         continue-on-error: true # Don't fail deployment if backend is not ready
-        
+
       - name: Deploy to Vercel (Preview)
         if: github.event_name == 'pull_request'
         uses: amondnet/vercel-action@v25
@@ -72,7 +72,7 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           working-directory: frontend
           scope: ${{ secrets.VERCEL_ORG_ID }}
-          
+
       - name: Deploy to Vercel (Production)
         if: github.ref == 'refs/heads/main'
         uses: amondnet/vercel-action@v25
@@ -80,10 +80,14 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          vercel-args: "--prod"
           working-directory: frontend
           scope: ${{ secrets.VERCEL_ORG_ID }}
-          
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_ENVIRONMENT: production
+          NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
+
       - name: Comment PR with deployment URL
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7

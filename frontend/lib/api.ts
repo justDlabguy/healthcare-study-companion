@@ -1,103 +1,278 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Environment-aware API base URL configuration
 const getApiBaseUrl = (): string => {
   // Use environment variable if available
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    // Ensure consistent URL format (remove trailing slash)
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
   }
-  
+
   // Fallback for development
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:8000';
+  if (process.env.NODE_ENV === "development") {
+    return "http://localhost:8000";
   }
-  
+
   // Production fallback - should be set via environment variables
-  console.warn('NEXT_PUBLIC_API_URL not set, using fallback URL');
-  return 'https://healthcare-study-companion-backend.railway.app';
+  console.warn("NEXT_PUBLIC_API_URL not set, using fallback URL");
+  return "https://healthcare-study-companion-backend.railway.app";
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+// CORS debugging utilities
+const getCorsDebugInfo = () => {
+  const currentOrigin =
+    typeof window !== "undefined" ? window.location.origin : "unknown";
+  const expectedOrigins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://healthcare-study-companion.vercel.app",
+  ];
+
+  return {
+    apiBaseUrl: API_BASE_URL,
+    currentOrigin,
+    expectedOrigins,
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
+  };
+};
+
+// Enhanced CORS error detection
+const isCorsError = (error: unknown): boolean => {
+  // Network error without response typically indicates CORS
+  if (error.code === "ERR_NETWORK" && !error.response) {
+    return true;
+  }
+
+  // Check for specific CORS-related error messages
+  const corsIndicators = [
+    "cors",
+    "cross-origin",
+    "preflight",
+    "access-control-allow-origin",
+    "network error",
+  ];
+
+  const errorMessage = (error.message || "").toLowerCase();
+  return corsIndicators.some((indicator) => errorMessage.includes(indicator));
+};
+
+// Log detailed CORS debugging information
+const logCorsError = (error: unknown, requestConfig: unknown) => {
+  const debugInfo = getCorsDebugInfo();
+
+  console.group("🚨 CORS Error Detected");
+  console.error("Error Details:", {
+    message: error.message,
+    code: error.code,
+    name: error.name,
+    stack: error.stack?.split("\n").slice(0, 3).join("\n"),
+  });
+
+  console.error("Request Details:", {
+    url: requestConfig?.url,
+    method: requestConfig?.method?.toUpperCase(),
+    baseURL: requestConfig?.baseURL,
+    fullUrl: `${requestConfig?.baseURL}${requestConfig?.url}`,
+    headers: requestConfig?.headers,
+  });
+
+  console.error("Environment Info:", debugInfo);
+
+  console.error("Troubleshooting Steps:");
+  console.error(
+    "1. Verify backend CORS configuration includes:",
+    debugInfo.currentOrigin
+  );
+  console.error(
+    "2. Check if backend server is running on:",
+    debugInfo.apiBaseUrl
+  );
+  console.error(
+    "3. Ensure CORS_ORIGINS environment variable includes frontend origin"
+  );
+  console.error(
+    "4. Try accessing API directly:",
+    `${debugInfo.apiBaseUrl}/docs`
+  );
+
+  if (
+    debugInfo.currentOrigin.includes("127.0.0.1") &&
+    debugInfo.apiBaseUrl.includes("localhost")
+  ) {
+    console.warn(
+      "⚠️  Origin mismatch detected: Frontend on 127.0.0.1 but API on localhost"
+    );
+    console.warn(
+      "   Consider using consistent hostnames (both localhost or both 127.0.0.1)"
+    );
+  }
+
+  console.groupEnd();
+};
 
 // Create axios instance with base URL and common headers
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
   withCredentials: true,
   timeout: 30000, // 30 second timeout
 });
 
-// Add request interceptor to include auth token
+// Add request interceptor to include auth token and ensure consistent URL handling
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Log API calls in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+
+    // Ensure consistent base URL usage - prevent double slashes
+    if (
+      config.url &&
+      config.url.startsWith("/") &&
+      config.baseURL?.endsWith("/")
+    ) {
+      config.url = config.url.substring(1);
     }
-    
+
+    // Log API calls in development with enhanced information
+    if (process.env.NODE_ENV === "development") {
+      const fullUrl = `${config.baseURL}${config.url}`;
+      console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${fullUrl}`);
+
+      // Log additional debug info for CORS troubleshooting
+      if (config.method?.toLowerCase() === "options") {
+        console.log("   ℹ️  Preflight request detected");
+      }
+
+      if (config.withCredentials) {
+        console.log("   🍪 Credentials included");
+      }
+    }
+
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
+    console.error("❌ API Request Error:", error);
     return Promise.reject(error);
   }
 );
 
-// Add response interceptor for error handling
+// Add response interceptor for enhanced error handling
 api.interceptors.response.use(
   (response) => {
     // Log successful responses in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`API Response: ${response.status} ${response.config.url}`);
+    if (process.env.NODE_ENV === "development") {
+      console.log(
+        `✅ API Response: ${
+          response.status
+        } ${response.config.method?.toUpperCase()} ${response.config.url}`
+      );
     }
     return response;
   },
   (error) => {
-    // Enhanced error logging for production debugging
+    // Enhanced error logging with detailed debugging information
     const errorInfo = {
       url: error.config?.url,
-      method: error.config?.method,
+      method: error.config?.method?.toUpperCase(),
+      baseURL: error.config?.baseURL,
+      fullUrl: error.config
+        ? `${error.config.baseURL}${error.config.url}`
+        : "unknown",
       status: error.response?.status,
+      statusText: error.response?.statusText,
       message: error.response?.data?.detail || error.message,
       timestamp: new Date().toISOString(),
-      isCorsError: error.code === 'ERR_NETWORK' && !error.response,
+      isCorsError: isCorsError(error),
+      headers: error.response?.headers,
+      requestHeaders: error.config?.headers,
     };
-    
-    console.error('API Error:', errorInfo);
-    
-    // Handle CORS errors specifically
+
+    // Handle CORS errors with detailed debugging
     if (errorInfo.isCorsError) {
-      console.error('CORS Error Detected:', {
-        apiBaseUrl: API_BASE_URL,
-        currentOrigin: typeof window !== 'undefined' ? window.location.origin : 'unknown',
-        suggestion: 'Check CORS configuration on the backend server'
-      });
+      logCorsError(error, error.config);
+
+      // Add user-friendly error message for CORS issues
+      const corsError = new Error(
+        `CORS Error: Unable to connect to API at ${errorInfo.fullUrl}. ` +
+          `This typically means the backend server is not running or CORS is not properly configured. ` +
+          `Check the browser console for detailed debugging information.`
+      );
+      corsError.name = "CorsError";
+      (
+        corsError as Error & {
+          originalError?: unknown;
+          debugInfo?: Record<string, unknown>;
+        }
+      ).originalError = error;
+      (
+        corsError as Error & {
+          originalError?: unknown;
+          debugInfo?: Record<string, unknown>;
+        }
+      ).debugInfo = getCorsDebugInfo();
+
+      return Promise.reject(corsError);
     }
-    
+
+    // Enhanced logging for non-CORS errors
+    console.group(
+      `❌ API Error: ${errorInfo.status || "Network"} ${errorInfo.method} ${
+        errorInfo.url
+      }`
+    );
+    console.error("Error Details:", errorInfo);
+
+    if (error.response?.data) {
+      console.error("Response Data:", error.response.data);
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.error("Full Error Object:", error);
+    }
+    console.groupEnd();
+
     // Handle specific error cases
     if (error.response?.status === 401) {
       // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('auth_token');
-      if (typeof window !== 'undefined' && window.location.pathname !== '/auth/login') {
-        window.location.href = '/auth/login';
+      console.warn("🔐 Authentication required - redirecting to login");
+      localStorage.removeItem("auth_token");
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/auth/login"
+      ) {
+        window.location.href = "/auth/login";
       }
     }
-    
+
     // Handle rate limiting
     if (error.response?.status === 429) {
-      const retryAfter = error.response.headers['retry-after'];
+      const retryAfter = error.response.headers["retry-after"];
       if (retryAfter) {
-        console.warn(`Rate limited. Retry after ${retryAfter} seconds`);
+        console.warn(`⏱️  Rate limited. Retry after ${retryAfter} seconds`);
       }
     }
-    
+
+    // Handle server errors
+    if (error.response?.status >= 500) {
+      console.error(
+        "🔥 Server Error - This may be a temporary issue. Please try again later."
+      );
+    }
+
+    // Handle client errors
+    if (error.response?.status >= 400 && error.response?.status < 500) {
+      console.warn(
+        "⚠️  Client Error - Check request parameters and authentication"
+      );
+    }
+
     return Promise.reject(error);
   }
 );
@@ -139,32 +314,32 @@ export const authApi = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     try {
       const formData = new FormData();
-      formData.append('username', credentials.email);
-      formData.append('password', credentials.password);
-      
-      const response = await api.post('/auth/login', formData, {
+      formData.append("username", credentials.email);
+      formData.append("password", credentials.password);
+
+      const response = await api.post("/auth/login", formData, {
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       });
-      
+
       // Store token in localStorage
-      localStorage.setItem('auth_token', response.data.access_token);
-      
+      localStorage.setItem("auth_token", response.data.access_token);
+
       // Fetch user data after successful login
-      const userResponse = await api.get('/auth/me', {
+      const userResponse = await api.get("/auth/me", {
         headers: {
-          'Authorization': `Bearer ${response.data.access_token}`
-        }
+          Authorization: `Bearer ${response.data.access_token}`,
+        },
       });
-      
+
       return {
         access_token: response.data.access_token,
         token_type: response.data.token_type,
-        user: userResponse.data
+        user: userResponse.data,
       };
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error("Login failed:", error);
       throw error;
     }
   },
@@ -174,27 +349,27 @@ export const authApi = {
    */
   signup: async (userData: SignupRequest): Promise<AuthResponse> => {
     try {
-      const response = await api.post('/auth/signup', userData, {
+      const response = await api.post("/auth/signup", userData, {
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
-      
+
       // Store token in localStorage if available in response
       if (response.data.access_token) {
-        localStorage.setItem('auth_token', response.data.access_token);
-        
+        localStorage.setItem("auth_token", response.data.access_token);
+
         // Fetch user data after successful signup
-        const userResponse = await api.get('/auth/me');
+        const userResponse = await api.get("/auth/me");
         return {
           ...response.data,
-          user: userResponse.data
+          user: userResponse.data,
         };
       }
-      
+
       return response.data;
     } catch (error) {
-      console.error('Signup failed:', error);
+      console.error("Signup failed:", error);
       throw error;
     }
   },
@@ -204,10 +379,10 @@ export const authApi = {
    */
   getCurrentUser: async (): Promise<User> => {
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get("/auth/me");
       return response.data;
     } catch (error) {
-      console.error('Failed to get current user:', error);
+      console.error("Failed to get current user:", error);
       throw error;
     }
   },
@@ -217,11 +392,11 @@ export const authApi = {
    */
   logout: async (): Promise<void> => {
     try {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem("auth_token");
       // Optionally call backend logout endpoint if it exists
       // await api.post('/auth/logout');
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error("Logout failed:", error);
       throw error;
     }
   },
@@ -231,9 +406,9 @@ export const authApi = {
    */
   requestPasswordReset: async (data: PasswordResetRequest): Promise<void> => {
     try {
-      await api.post('/auth/password-reset', data);
+      await api.post("/auth/password-reset", data);
     } catch (error) {
-      console.error('Password reset request failed:', error);
+      console.error("Password reset request failed:", error);
       throw error;
     }
   },
@@ -266,10 +441,10 @@ export const topicsApi = {
    */
   getTopics: async (): Promise<Topic[]> => {
     try {
-      const response = await api.get('/topics');
+      const response = await api.get("/topics");
       return response.data;
     } catch (error) {
-      console.error('Failed to get topics:', error);
+      console.error("Failed to get topics:", error);
       throw error;
     }
   },
@@ -282,7 +457,7 @@ export const topicsApi = {
       const response = await api.get(`/topics/${topicId}`);
       return response.data;
     } catch (error) {
-      console.error('Failed to get topic:', error);
+      console.error("Failed to get topic:", error);
       throw error;
     }
   },
@@ -292,10 +467,10 @@ export const topicsApi = {
    */
   createTopic: async (data: CreateTopicRequest): Promise<Topic> => {
     try {
-      const response = await api.post('/topics/', data);
+      const response = await api.post("/topics/", data);
       return response.data;
     } catch (error) {
-      console.error('Failed to create topic:', error);
+      console.error("Failed to create topic:", error);
       throw error;
     }
   },
@@ -303,12 +478,15 @@ export const topicsApi = {
   /**
    * Update a topic
    */
-  updateTopic: async (topicId: number, data: UpdateTopicRequest): Promise<Topic> => {
+  updateTopic: async (
+    topicId: number,
+    data: UpdateTopicRequest
+  ): Promise<Topic> => {
     try {
       const response = await api.put(`/topics/${topicId}`, data);
       return response.data;
     } catch (error) {
-      console.error('Failed to update topic:', error);
+      console.error("Failed to update topic:", error);
       throw error;
     }
   },
@@ -320,7 +498,7 @@ export const topicsApi = {
     try {
       await api.delete(`/topics/${topicId}`);
     } catch (error) {
-      console.error('Failed to delete topic:', error);
+      console.error("Failed to delete topic:", error);
       throw error;
     }
   },
@@ -333,7 +511,7 @@ export interface Document {
   file_path: string;
   file_size: number;
   mime_type: string;
-  status: 'PENDING' | 'PROCESSING' | 'PROCESSED' | 'ERROR';
+  status: "PENDING" | "PROCESSING" | "PROCESSED" | "ERROR";
   error_message?: string;
   topic_id: number;
   user_id: number;
@@ -350,7 +528,7 @@ export interface QAResponse {
   confidence?: number;
   tokens_used?: number;
   model?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface QAHistoryResponse {
@@ -437,7 +615,7 @@ export const documentsApi = {
       const response = await api.get(`/topics/${topicId}/documents`);
       return response.data;
     } catch (error) {
-      console.error('Failed to get documents:', error);
+      console.error("Failed to get documents:", error);
       throw error;
     }
   },
@@ -448,16 +626,20 @@ export const documentsApi = {
   uploadDocument: async (topicId: number, file: File): Promise<Document> => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
-      const response = await api.post(`/topics/${topicId}/documents`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post(
+        `/topics/${topicId}/documents`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to upload document:', error);
+      console.error("Failed to upload document:", error);
       throw error;
     }
   },
@@ -465,11 +647,14 @@ export const documentsApi = {
   /**
    * Delete a document
    */
-  deleteDocument: async (topicId: number, documentId: number): Promise<void> => {
+  deleteDocument: async (
+    topicId: number,
+    documentId: number
+  ): Promise<void> => {
     try {
       await api.delete(`/topics/${topicId}/documents/${documentId}`);
     } catch (error) {
-      console.error('Failed to delete document:', error);
+      console.error("Failed to delete document:", error);
       throw error;
     }
   },
@@ -482,7 +667,7 @@ export const documentsApi = {
       const response = await api.post(`/documents/${documentId}/reprocess`);
       return response.data;
     } catch (error) {
-      console.error('Failed to reprocess document:', error);
+      console.error("Failed to reprocess document:", error);
       throw error;
     }
   },
@@ -498,7 +683,7 @@ export const qaApi = {
       const response = await api.get(`/topics/${topicId}/qa/history`);
       return response.data;
     } catch (error) {
-      console.error('Failed to get Q&A history:', error);
+      console.error("Failed to get Q&A history:", error);
       throw error;
     }
   },
@@ -506,14 +691,18 @@ export const qaApi = {
   /**
    * Ask a question about a topic
    */
-  askQuestion: async (topicId: number, question: string, context?: string): Promise<QAResponse> => {
+  askQuestion: async (
+    topicId: number,
+    question: string,
+    context?: string
+  ): Promise<QAResponse> => {
     try {
       const response = await api.post(`/topics/${topicId}/qa/ask`, {
         question,
         context,
-        temperature: 0.7
+        temperature: 0.7,
       });
-      
+
       // Create a mock QA response since the backend returns just the answer
       const qaResponse: QAResponse = {
         id: Date.now(), // Temporary ID
@@ -523,12 +712,12 @@ export const qaApi = {
         created_at: new Date().toISOString(),
         confidence: response.data.confidence,
         tokens_used: response.data.tokens_used,
-        model: response.data.model
+        model: response.data.model,
       };
-      
+
       return qaResponse;
     } catch (error) {
-      console.error('Failed to ask question:', error);
+      console.error("Failed to ask question:", error);
       throw error;
     }
   },
@@ -540,7 +729,7 @@ export const qaApi = {
     try {
       await api.delete(`/topics/${topicId}/qa/history/${qaId}`);
     } catch (error) {
-      console.error('Failed to delete Q&A:', error);
+      console.error("Failed to delete Q&A:", error);
       throw error;
     }
   },
@@ -552,7 +741,7 @@ export const qaApi = {
     try {
       await api.delete(`/topics/${topicId}/qa/history`);
     } catch (error) {
-      console.error('Failed to delete all Q&A history:', error);
+      console.error("Failed to delete all Q&A history:", error);
       throw error;
     }
   },
@@ -568,7 +757,7 @@ export const flashcardsApi = {
       const response = await api.get(`/topics/${topicId}/flashcards`);
       return response.data;
     } catch (error) {
-      console.error('Failed to get flashcards:', error);
+      console.error("Failed to get flashcards:", error);
       throw error;
     }
   },
@@ -576,12 +765,17 @@ export const flashcardsApi = {
   /**
    * Get flashcards due for review
    */
-  getFlashcardsForReview: async (topicId: number, limit: number = 20): Promise<Flashcard[]> => {
+  getFlashcardsForReview: async (
+    topicId: number,
+    limit: number = 20
+  ): Promise<Flashcard[]> => {
     try {
-      const response = await api.get(`/topics/${topicId}/flashcards/review?limit=${limit}`);
+      const response = await api.get(
+        `/topics/${topicId}/flashcards/review?limit=${limit}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to get flashcards for review:', error);
+      console.error("Failed to get flashcards for review:", error);
       throw error;
     }
   },
@@ -589,12 +783,23 @@ export const flashcardsApi = {
   /**
    * Create a new flashcard
    */
-  createFlashcard: async (topicId: number, flashcard: { front: string; back: string; tags?: string[]; difficulty?: number }): Promise<Flashcard> => {
+  createFlashcard: async (
+    topicId: number,
+    flashcard: {
+      front: string;
+      back: string;
+      tags?: string[];
+      difficulty?: number;
+    }
+  ): Promise<Flashcard> => {
     try {
-      const response = await api.post(`/topics/${topicId}/flashcards`, flashcard);
+      const response = await api.post(
+        `/topics/${topicId}/flashcards`,
+        flashcard
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to create flashcard:', error);
+      console.error("Failed to create flashcard:", error);
       throw error;
     }
   },
@@ -602,14 +807,21 @@ export const flashcardsApi = {
   /**
    * Review a flashcard
    */
-  reviewFlashcard: async (topicId: number, flashcardId: number, quality: number): Promise<any> => {
+  reviewFlashcard: async (
+    topicId: number,
+    flashcardId: number,
+    quality: number
+  ): Promise<any> => {
     try {
-      const response = await api.post(`/topics/${topicId}/flashcards/${flashcardId}/review`, {
-        quality
-      });
+      const response = await api.post(
+        `/topics/${topicId}/flashcards/${flashcardId}/review`,
+        {
+          quality,
+        }
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to review flashcard:', error);
+      console.error("Failed to review flashcard:", error);
       throw error;
     }
   },
@@ -617,16 +829,23 @@ export const flashcardsApi = {
   /**
    * Generate flashcards from content
    */
-  generateFlashcards: async (topicId: number, content: string, numCards: number = 5): Promise<Flashcard[]> => {
+  generateFlashcards: async (
+    topicId: number,
+    content: string,
+    numCards: number = 5
+  ): Promise<Flashcard[]> => {
     try {
-      const response = await api.post(`/topics/${topicId}/flashcards/generate`, {
-        content,
-        num_cards: numCards,
-        style: 'basic'
-      });
+      const response = await api.post(
+        `/topics/${topicId}/flashcards/generate`,
+        {
+          content,
+          num_cards: numCards,
+          style: "basic",
+        }
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to generate flashcards:', error);
+      console.error("Failed to generate flashcards:", error);
       throw error;
     }
   },
@@ -642,7 +861,7 @@ export const studySessionsApi = {
     try {
       await api.delete(`/study-sessions/${sessionId}`);
     } catch (error) {
-      console.error('Failed to delete study session:', error);
+      console.error("Failed to delete study session:", error);
       throw error;
     }
   },
@@ -659,15 +878,18 @@ export const searchApi = {
    * Search within a specific topic
    */
   searchWithinTopic: async (
-    topicId: number, 
-    searchQuery: SearchQuery, 
+    topicId: number,
+    searchQuery: SearchQuery,
     limit: number = 10
   ): Promise<SearchResponse> => {
     try {
-      const response = await api.post(`/search/topics/${topicId}?limit=${limit}`, searchQuery);
+      const response = await api.post(
+        `/search/topics/${topicId}?limit=${limit}`,
+        searchQuery
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to search within topic:', error);
+      console.error("Failed to search within topic:", error);
       throw error;
     }
   },
@@ -682,15 +904,18 @@ export const searchApi = {
   ): Promise<CrossTopicSearchResponse> => {
     try {
       const params = new URLSearchParams();
-      params.append('limit_per_topic', limitPerTopic.toString());
+      params.append("limit_per_topic", limitPerTopic.toString());
       if (topicIds) {
-        topicIds.forEach(id => params.append('topic_ids', id.toString()));
+        topicIds.forEach((id) => params.append("topic_ids", id.toString()));
       }
-      
-      const response = await api.post(`/search/?${params.toString()}`, searchQuery);
+
+      const response = await api.post(
+        `/search/?${params.toString()}`,
+        searchQuery
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to search across topics:', error);
+      console.error("Failed to search across topics:", error);
       throw error;
     }
   },
@@ -708,16 +933,75 @@ export const searchApi = {
       const params = new URLSearchParams({
         query,
         max_chunks: maxChunks.toString(),
-        max_length: maxLength.toString()
+        max_length: maxLength.toString(),
       });
-      
-      const response = await api.get(`/search/topics/${topicId}/context?${params.toString()}`);
+
+      const response = await api.get(
+        `/search/topics/${topicId}/context?${params.toString()}`
+      );
       return response.data;
     } catch (error) {
-      console.error('Failed to get search context:', error);
+      console.error("Failed to get search context:", error);
       throw error;
     }
   },
 };
 
+// Utility function to test API connectivity and CORS configuration
+export const testApiConnectivity = async (): Promise<{
+  success: boolean;
+  message: string;
+  debugInfo: Record<string, unknown>;
+}> => {
+  try {
+    console.log("🔍 Testing API connectivity...");
+    const debugInfo = getCorsDebugInfo();
+
+    // Test basic connectivity with a simple GET request
+    const response = await api.get("/docs", { timeout: 5000 });
+
+    return {
+      success: true,
+      message: "API connectivity test successful",
+      debugInfo: {
+        ...debugInfo,
+        responseStatus: response.status,
+        responseHeaders: response.headers,
+      },
+    };
+  } catch (error: unknown) {
+    const debugInfo = getCorsDebugInfo();
+
+    if (isCorsError(error)) {
+      return {
+        success: false,
+        message: "CORS configuration issue detected",
+        debugInfo: {
+          ...debugInfo,
+          error: error.message,
+          suggestions: [
+            "Verify backend server is running",
+            "Check CORS_ORIGINS includes current origin",
+            "Ensure consistent hostname usage (localhost vs 127.0.0.1)",
+            "Try accessing API docs directly: " +
+              debugInfo.apiBaseUrl +
+              "/docs",
+          ],
+        },
+      };
+    }
+
+    return {
+      success: false,
+      message: "API connectivity test failed",
+      debugInfo: {
+        ...debugInfo,
+        error: error.message,
+        status: error.response?.status,
+      },
+    };
+  }
+};
+
+// Export enhanced API client as default
 export default api;

@@ -19,13 +19,20 @@ from .routers import llm as llm_router
 from .routers import search as search_router
 from .config import settings
 from .database import SessionLocal, engine, Base
+from .logging_config import setup_logging, get_logger, LoggingMiddleware, error_tracker
+from .monitoring import router as monitoring_router
+
+# Set up structured logging
+setup_logging(
+    log_level=settings.log_level,
+    structured=settings.structured_logging
+)
 
 # Create the database tables
 Base.metadata.create_all(bind=engine)
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# Get structured logger
+logger = get_logger(__name__)
 
 app = FastAPI(
     title="Healthcare Study Companion API",
@@ -44,15 +51,44 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": f"Internal Server Error: {str(exc)}"},
     )
 
-# Configure CORS from settings
+# CORS debugging middleware (only in development)
+@app.middleware("http")
+async def cors_debug_middleware(request: Request, call_next):
+    if settings.environment == "development":
+        origin = request.headers.get("origin")
+        method = request.method
+        
+        if method == "OPTIONS" or origin:
+            logger.debug(f"CORS Request - Method: {method}, Origin: {origin}, Path: {request.url.path}")
+            logger.debug(f"Allowed origins: {settings.allowed_origins}")
+    
+    response = await call_next(request)
+    return response
+
+# Configure CORS from settings with enhanced preflight handling
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=86400,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "X-CSRF-Token",
+        "Cache-Control",
+        "Pragma"
+    ],
+    expose_headers=[
+        "Content-Length",
+        "Content-Type",
+        "X-Total-Count",
+        "X-Page-Count"
+    ],
+    max_age=86400,  # Cache preflight requests for 24 hours
 )
 
 # Database dependency
@@ -107,6 +143,23 @@ async def health_check(db: Session = Depends(get_db)):
                 "timestamp": datetime.utcnow().isoformat()
             }
         )
+
+# CORS test endpoint for development
+@app.get("/cors-test")
+@app.options("/cors-test")
+async def cors_test(request: Request):
+    """Test endpoint to verify CORS configuration."""
+    origin = request.headers.get("origin", "No origin header")
+    user_agent = request.headers.get("user-agent", "No user-agent")
+    
+    return {
+        "message": "CORS test successful",
+        "origin": origin,
+        "user_agent": user_agent,
+        "allowed_origins": settings.allowed_origins,
+        "environment": settings.environment,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 # Root endpoint
 @app.get("/")

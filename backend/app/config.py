@@ -15,10 +15,8 @@ class ConfigurationError(Exception):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=[
-            'local.env',  # Primary env file
-            '.env.development',  # Environment-specific fallback
-            '.env.staging',
-            '.env.production'
+            'local.env',  # Primary env file - highest priority
+            '.env.development',  # Development fallback
         ],
         env_file_encoding='utf-8',
         extra='ignore',  # Ignore extra fields in environment variables
@@ -44,6 +42,7 @@ class Settings(BaseSettings):
         """Generate database connection string."""
         if self.database_url:
             return self.database_url
+        # Default to MySQL/TiDB format if no specific URL is provided
         return f"mysql+pymysql://{self.database_user}:{self.database_password}@{self.database_host}:{self.database_port}/{self.database_name}"
     
     @model_validator(mode='after')
@@ -51,8 +50,10 @@ class Settings(BaseSettings):
         """Ensure database URL is properly formatted."""
         if not self.database_url:
             self.database_url = self.tidb_connection_string
-        elif not self.database_url.startswith("mysql+") and not self.database_url.startswith("mysql://"):
-            self.database_url = f"mysql+pymysql://{self.database_url}" if "://" not in self.database_url else self.database_url
+        elif not self.database_url.startswith(("mysql+", "mysql://", "sqlite://", "sqlite:///")):
+            # Only convert to MySQL format if it doesn't look like SQLite
+            if not self.database_url.endswith(".db") and "sqlite" not in self.database_url.lower():
+                self.database_url = f"mysql+pymysql://{self.database_url}" if "://" not in self.database_url else self.database_url
         return self
     
     # CORS - use a simple string for development
@@ -133,10 +134,12 @@ class Settings(BaseSettings):
         
         # Check database URL format and SSL for production
         if self.database_url:
-            if not self.database_url.startswith(("mysql+", "mysql://")):
+            if not self.database_url.startswith(("mysql+", "mysql://", "sqlite://", "sqlite:///")):
                 warnings.append("Database URL should use mysql+ driver for better compatibility")
             
-            if self.environment == "production" and "ssl" not in self.database_url.lower():
+            if (self.environment == "production" and 
+                "ssl" not in self.database_url.lower() and 
+                not self.database_url.startswith("sqlite")):
                 warnings.append("SSL not configured for production database - consider adding SSL parameters")
         
         # Validate JWT secret
@@ -281,9 +284,33 @@ class Settings(BaseSettings):
 
 
 def get_settings() -> Settings:
-    """Get validated settings instance."""
+    """Get validated settings instance with environment-aware loading."""
     try:
-        return Settings()
+        # Determine which environment files to load based on ENVIRONMENT variable
+        env = os.getenv("ENVIRONMENT", "development").lower()
+        
+        env_files = ['local.env']  # Always load local.env first
+        
+        if env == "development":
+            env_files.append('.env.development')
+        elif env == "staging":
+            env_files.append('.env.staging')
+        elif env == "production":
+            env_files.append('.env.production')
+        else:
+            # Default to development
+            env_files.append('.env.development')
+        
+        # Create settings with dynamic env_file list
+        class DynamicSettings(Settings):
+            model_config = SettingsConfigDict(
+                env_file=env_files,
+                env_file_encoding='utf-8',
+                extra='ignore',
+                case_sensitive=False
+            )
+        
+        return DynamicSettings()
     except Exception as e:
         logger.error(f"Failed to load configuration: {e}")
         if os.getenv("ENVIRONMENT") == "production":

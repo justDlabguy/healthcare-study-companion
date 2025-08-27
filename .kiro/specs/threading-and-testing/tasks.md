@@ -147,7 +147,7 @@ This document outlines the specific coding tasks required to complete the Health
     - ✅ All tests passing successfully
     - _Requirements: 5.4, 5.6_
 
-  - [ ] 5.4 Add test coverage reporting
+  - [x] 5.4 Add test coverage reporting
 
     - Configure coverage.py for test coverage measurement
     - Add coverage reporting to CI/CD pipeline
@@ -194,7 +194,7 @@ This document outlines the specific coding tasks required to complete the Health
     - Test database connectivity in production
     - _Requirements: 7.1, 7.5_
 
-  - [-] 7.3 Set up Vercel deployment
+  - [x] 7.3 Set up Vercel deployment
 
     - Configure Next.js build for Vercel
     - Set up API base URL environment variable
@@ -202,6 +202,7 @@ This document outlines the specific coding tasks required to complete the Health
     - _Requirements: 7.2, 7.5_
 
   - [ ] 7.4 Add monitoring and logging
+
     - Implement structured logging with request IDs
     - Add health check endpoints for monitoring
     - Set up error tracking and alerting

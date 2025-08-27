@@ -49,12 +49,14 @@ Replace `https://your-backend.railway.app` with your actual backend URL.
 ### Option A: Automatic Deployment (Recommended)
 
 1. **Connect Repository to Vercel**
+
    - Go to [vercel.com](https://vercel.com) and sign in
    - Click "New Project"
    - Import your GitHub repository
    - Select the `frontend` directory as the root directory
 
 2. **Configure Build Settings**
+
    - Framework Preset: Next.js
    - Root Directory: `frontend`
    - Build Command: `npm run build` (auto-detected)
@@ -62,19 +64,21 @@ Replace `https://your-backend.railway.app` with your actual backend URL.
    - Install Command: `npm install` (auto-detected)
 
 3. **Set Environment Variables**
-   
+
    In the Vercel dashboard, go to your project → Settings → Environment Variables and add:
 
    ```bash
    # Required Variables
-   NEXT_PUBLIC_API_URL=https://your-backend.railway.app
+   NEXT_PUBLIC_API_URL=https://your-railway-app.railway.app
    NEXT_PUBLIC_ENVIRONMENT=production
    NEXT_PUBLIC_APP_NAME=Healthcare Study Companion
-   
+
    # Optional Variables
    NEXT_PUBLIC_ENABLE_DEBUG_MODE=false
    NEXT_PUBLIC_ENABLE_ANALYTICS=true
    ```
+
+   **Important**: Replace `https://your-railway-app.railway.app` with your actual Railway backend URL. You can find this in your Railway dashboard after deploying the backend.
 
 4. **Deploy**
    - Click "Deploy"
@@ -84,16 +88,19 @@ Replace `https://your-backend.railway.app` with your actual backend URL.
 ### Option B: Manual Deployment with CLI
 
 1. **Install Vercel CLI**
+
    ```bash
    npm install -g vercel
    ```
 
 2. **Login to Vercel**
+
    ```bash
    vercel login
    ```
 
 3. **Deploy from Frontend Directory**
+
    ```bash
    cd frontend
    vercel --prod
@@ -116,6 +123,7 @@ npm run deploy:vercel
 ```
 
 This script will:
+
 - Validate environment configuration
 - Test local build
 - Test API connectivity
@@ -125,20 +133,20 @@ This script will:
 
 ### Required Environment Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `NEXT_PUBLIC_API_URL` | Backend API base URL | `https://your-backend.railway.app` |
-| `NEXT_PUBLIC_ENVIRONMENT` | Application environment | `production` |
-| `NEXT_PUBLIC_APP_NAME` | Application display name | `Healthcare Study Companion` |
+| Variable                  | Description              | Example                            |
+| ------------------------- | ------------------------ | ---------------------------------- |
+| `NEXT_PUBLIC_API_URL`     | Backend API base URL     | `https://your-backend.railway.app` |
+| `NEXT_PUBLIC_ENVIRONMENT` | Application environment  | `production`                       |
+| `NEXT_PUBLIC_APP_NAME`    | Application display name | `Healthcare Study Companion`       |
 
 ### Optional Environment Variables
 
-| Variable | Description | Default | Example |
-|----------|-------------|---------|---------|
-| `NEXT_PUBLIC_ENABLE_DEBUG_MODE` | Enable debug mode | `false` | `false` |
-| `NEXT_PUBLIC_ENABLE_ANALYTICS` | Enable analytics | `false` | `true` |
-| `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | Vercel Analytics ID | - | `your-analytics-id` |
-| `NEXT_PUBLIC_SENTRY_DSN` | Sentry error tracking | - | `https://xxx@sentry.io/xxx` |
+| Variable                          | Description           | Default | Example                     |
+| --------------------------------- | --------------------- | ------- | --------------------------- |
+| `NEXT_PUBLIC_ENABLE_DEBUG_MODE`   | Enable debug mode     | `false` | `false`                     |
+| `NEXT_PUBLIC_ENABLE_ANALYTICS`    | Enable analytics      | `false` | `true`                      |
+| `NEXT_PUBLIC_VERCEL_ANALYTICS_ID` | Vercel Analytics ID   | -       | `your-analytics-id`         |
+| `NEXT_PUBLIC_SENTRY_DSN`          | Sentry error tracking | -       | `https://xxx@sentry.io/xxx` |
 
 ### Setting Environment Variables in Vercel
 
@@ -151,14 +159,15 @@ This script will:
 ## Step 4: Configure Custom Domain (Optional)
 
 1. **Add Domain in Vercel**
+
    - Go to Settings → Domains
    - Add your custom domain
    - Follow DNS configuration instructions
 
 2. **Update CORS Configuration**
-   
+
    Update your backend's CORS configuration to include your custom domain:
-   
+
    ```bash
    # In Railway, update CORS_ORIGINS environment variable
    CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com,https://your-app.vercel.app
@@ -180,6 +189,7 @@ npm run test:connectivity https://your-app.vercel.app
 ```
 
 Or test manually:
+
 1. Try to sign up for a new account
 2. Try to log in
 3. Create a topic
@@ -222,6 +232,7 @@ Set up Sentry for error tracking:
 **Symptoms**: Deployment fails during build phase
 
 **Solutions**:
+
 - Check build logs in Vercel dashboard
 - Ensure all dependencies are in `package.json`
 - Test build locally: `npm run build`
@@ -232,6 +243,7 @@ Set up Sentry for error tracking:
 **Symptoms**: App loads but features don't work
 
 **Solutions**:
+
 - Verify all environment variables are set in Vercel
 - Check variable names (must start with `NEXT_PUBLIC_`)
 - Redeploy after adding variables
@@ -242,6 +254,7 @@ Set up Sentry for error tracking:
 **Symptoms**: Frontend loads but can't connect to backend
 
 **Solutions**:
+
 - Verify `NEXT_PUBLIC_API_URL` is correct
 - Check backend is deployed and accessible
 - Verify CORS configuration in backend
@@ -252,6 +265,7 @@ Set up Sentry for error tracking:
 **Symptoms**: "CORS policy" errors in browser console
 
 **Solutions**:
+
 - Update backend `CORS_ORIGINS` to include Vercel domain
 - Include both `https://your-app.vercel.app` and custom domain
 - Redeploy backend after CORS changes
@@ -262,6 +276,7 @@ Set up Sentry for error tracking:
 **Symptoms**: Direct URLs return 404 errors
 
 **Solutions**:
+
 - Verify `vercel.json` configuration is correct
 - Check Next.js routing configuration
 - Ensure all pages are properly exported
@@ -297,6 +312,7 @@ The deployment includes several optimizations:
 ### Headers
 
 The deployment includes security headers:
+
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: SAMEORIGIN`
 - `X-XSS-Protection: 1; mode=block`
@@ -323,6 +339,7 @@ The deployment includes security headers:
 ### Scaling
 
 Vercel automatically handles scaling, but monitor:
+
 - Function execution times
 - Bandwidth usage
 - Build minutes usage
@@ -340,25 +357,25 @@ name: Deploy Frontend to Vercel
 on:
   push:
     branches: [main]
-    paths: ['frontend/**']
+    paths: ["frontend/**"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
           cache-dependency-path: frontend/package-lock.json
-      
+
       - name: Install dependencies
         run: npm ci
         working-directory: frontend
-      
+
       - name: Validate environment
         run: npm run validate:env production
         working-directory: frontend
@@ -366,7 +383,7 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_ENVIRONMENT: production
           NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
-      
+
       - name: Build application
         run: npm run build
         working-directory: frontend
@@ -374,7 +391,7 @@ jobs:
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_ENVIRONMENT: production
           NEXT_PUBLIC_APP_NAME: Healthcare Study Companion
-      
+
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:
@@ -389,17 +406,20 @@ jobs:
 After successful Vercel deployment:
 
 1. **Test End-to-End Functionality**
+
    - Complete user registration and login flow
    - Test document upload and processing
    - Verify Q&A functionality
    - Test flashcard generation and review
 
 2. **Set Up Monitoring**
+
    - Configure Vercel Analytics
    - Set up error tracking with Sentry
    - Create uptime monitoring
 
 3. **Performance Optimization**
+
    - Analyze bundle size and optimize
    - Set up performance monitoring
    - Configure caching strategies

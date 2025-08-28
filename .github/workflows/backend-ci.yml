@@ -13,7 +13,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('backend/requirements.txt') != '' }}
+    outputs:
+      has_requirements: ${{ steps.check_requirements.outputs.has_requirements }}
 
     services:
       mysql:
@@ -26,6 +27,19 @@ jobs:
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
+      - name: Check for requirements.txt
+        id: check_requirements
+        run: |
+          if [ -f "backend/requirements.txt" ]; then
+            echo "has_requirements=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_requirements=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Exit if no requirements.txt
+        if: steps.check_requirements.outputs.has_requirements != 'true'
+        run: exit 0
+
       - name: Checkout
         uses: actions/checkout@v4
 

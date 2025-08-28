@@ -13,13 +13,23 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('frontend/package.json') != '' }}
     
     steps:
+      - name: Check if frontend files exist
+        id: check-files
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            echo "files_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "files_exist=false" >> $GITHUB_OUTPUT
+          fi
+        
       - name: Checkout
+        if: steps.check-files.outputs.files_exist == 'true'
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: steps.check-files.outputs.files_exist == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -27,6 +37,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        if: steps.check-files.outputs.files_exist == 'true'
         working-directory: frontend
         run: npm ci
 

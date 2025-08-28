@@ -1,0 +1,20 @@
+# nixpacks.toml
+
+[phases.setup]
+# Use 'aptPkgs' to install Debian/Ubuntu packages.
+# '...' is a special syntax that tells Nixpacks to extend the
+# list of packages with the ones it would have installed automatically.
+# 'default-libmysqlclient-dev' is the key dependency needed for mysqlclient.
+aptPkgs = ["...", "default-libmysqlclient-dev", "gcc"]
+
+[phases.build]
+# Use 'pip' to install Python dependencies.
+pip = ["-r requirements.txt"]
+
+[phases.deploy]
+# Use 'uv' to run the uvicorn command.
+uv = ["app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+[phases.cleanup]
+# Use 'rm' to remove files.
+rm = ["-rf", "/app"]

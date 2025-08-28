@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Activate Render's virtual environment
+source /opt/render/project/src/.venv/bin/activate
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

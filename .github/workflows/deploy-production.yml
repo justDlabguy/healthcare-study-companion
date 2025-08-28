@@ -35,6 +35,11 @@ jobs:
       ENVIRONMENT: production
       LLM_PROVIDER: mistral
       EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED || 'false' }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_FROM_EMAIL: ${{ vars.SMTP_FROM_EMAIL }}
+      SMTP_SERVER: ${{ vars.SMTP_SERVER }}
+      SMTP_PORT: ${{ vars.SMTP_PORT }}
       LOG_LEVEL: INFO
       STRUCTURED_LOGGING: true
       RAILWAY_DEPLOYMENT_ID: ${{ github.run_id }}
@@ -50,15 +55,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Set up email environment variables
-        if: ${{ vars.EMAIL_ENABLED == 'true' }}
-        run: |
-          echo "SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}" >> $GITHUB_ENV
-          echo "SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}" >> $GITHUB_ENV
-          echo "SMTP_FROM_EMAIL=${{ vars.SMTP_FROM_EMAIL }}" >> $GITHUB_ENV
-          echo "SMTP_SERVER=${{ vars.SMTP_SERVER }}" >> $GITHUB_ENV
-          echo "SMTP_PORT=${{ vars.SMTP_PORT }}" >> $GITHUB_ENV
+          
+      # FIX: Install system dependencies required for building mysqlclient
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libmysqlclient-dev
 
       - name: Install dependencies
         run: |

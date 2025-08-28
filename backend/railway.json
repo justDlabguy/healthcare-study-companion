@@ -1,23 +1,11 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS"
-  },
-  "deploy": {
-    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}",
-    "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 5
-  },
-  "nixpacks": {
-    "phases": {
-      "setup": {
-        "aptPkgs": [
-          "default-libmysqlclient-dev",
-          "gcc",
-          "python3-dev",
-          "libpq-dev"
-        ]
-      }
+    "$schema": "https://railway.app/railway.schema.json",
+    "build": {
+      "builder": "NIXPACKS",
+      "buildCommand": "sudo apt-get update && sudo apt-get install -y default-libmysqlclient-dev && pip install -r requirements.txt"
+    },
+    "deploy": {
+      "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
     }
   }
-}
+  

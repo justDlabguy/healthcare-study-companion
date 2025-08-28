@@ -43,3 +43,6 @@ uuid==1.30
 # Document processing
 PyPDF2==3.0.1
 pymupdf==1.23.26
+
+# System Monitoring
+psutil

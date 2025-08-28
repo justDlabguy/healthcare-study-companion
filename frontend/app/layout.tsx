@@ -7,6 +7,7 @@ import { ToastProvider } from "../components/providers/toast-provider";
 import { Toaster } from "../components/ui/toaster";
 import { AppLayout } from "../components/navigation";
 import ErrorBoundary from "../components/error-boundary";
+import { Analytics } from '@vercel/analytics/next';
 
 export default function RootLayout({
   children,

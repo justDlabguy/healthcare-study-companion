@@ -849,6 +849,29 @@ export const flashcardsApi = {
       throw error;
     }
   },
+
+  /**
+   * Generate flashcards from processed documents in the topic
+   */
+  generateFlashcardsFromDocuments: async (
+    topicId: number,
+    numCards: number = 5,
+    cardType: string = "basic"
+  ): Promise<Flashcard[]> => {
+    try {
+      const response = await api.post(
+        `/topics/${topicId}/flashcards/generate`,
+        {
+          num_cards: numCards,
+          style: cardType,
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Failed to generate flashcards from documents:", error);
+      throw error;
+    }
+  },
 };
 
 // Study Session API

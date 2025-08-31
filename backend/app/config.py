@@ -61,12 +61,13 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
     
     # LLM Configuration
-    llm_provider: str = "openai"  # Options: 'openai', 'anthropic', 'huggingface', 'together', 'mistral'
+    llm_provider: str = "openai"  # Options: 'openai', 'anthropic', 'huggingface', 'together', 'mistral', 'kiwi'
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     huggingface_api_key: Optional[str] = None
     together_api_key: Optional[str] = None
     mistral_api_key: Optional[str] = None
+    kiwi_api_key: Optional[str] = None
     
     # Model configurations
     default_llm_model: str = "gpt-4"
@@ -78,6 +79,28 @@ class Settings(BaseSettings):
     llm_rate_limit_per_minute: int = 60
     llm_max_tokens: int = 4096
     llm_temperature: float = 0.7
+    
+    # Circuit breaker configuration
+    circuit_breaker_failure_threshold: int = 5
+    circuit_breaker_recovery_timeout: int = 60
+    circuit_breaker_half_open_max_calls: int = 3
+    
+    # Exponential backoff configuration
+    retry_max_attempts: int = 3
+    retry_base_delay: float = 1.0
+    retry_max_delay: float = 60.0
+    retry_backoff_multiplier: float = 2.0
+    
+    # API key validation and health check configuration
+    api_key_validation_interval_minutes: int = 30
+    health_check_timeout_seconds: int = 10
+    api_usage_monitoring_enabled: bool = True
+    api_quota_warning_threshold: float = 0.8  # Warn at 80% of quota
+    
+    # API key rotation configuration
+    api_key_rotation_enabled: bool = False
+    api_key_rotation_interval_hours: int = 24
+    api_key_backup_count: int = 3
     
     @property
     def allowed_origins(self) -> list[str]:
@@ -162,7 +185,8 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_api_key,
             "huggingface": self.huggingface_api_key,
             "together": self.together_api_key,
-            "mistral": self.mistral_api_key
+            "mistral": self.mistral_api_key,
+            "kiwi": self.kiwi_api_key
         }
         
         if self.llm_provider not in llm_key_mapping:
@@ -262,7 +286,8 @@ class Settings(BaseSettings):
             "anthropic": self.anthropic_api_key,
             "huggingface": self.huggingface_api_key,
             "together": self.together_api_key,
-            "mistral": self.mistral_api_key
+            "mistral": self.mistral_api_key,
+            "kiwi": self.kiwi_api_key
         }
         return key_mapping.get(target_provider)
     

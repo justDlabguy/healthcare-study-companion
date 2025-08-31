@@ -2,6 +2,19 @@
   "name": "healthcare-study-companion-frontend",
   "private": true,
   "version": "0.1.0",
+  "keywords": [
+    "healthcare",
+    "education",
+    "ai",
+    "study-tools",
+    "medical-education",
+    "flashcard-app",
+    "spaced-repetition",
+    "nextjs",
+    "fastapi",
+    "python",
+    "typescript"
+  ],
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

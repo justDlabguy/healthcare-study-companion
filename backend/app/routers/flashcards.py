@@ -138,10 +138,21 @@ async def generate_flashcards(
             ).all()
             
             if not documents:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No processed documents found in topic. Please upload and process documents first, or provide content directly."
-                )
+                # Check if there are any documents at all
+                all_documents = db.query(Document).filter(Document.topic_id == topic_id).all()
+                if not all_documents:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No documents found in topic. Please upload documents first, or provide content directly in the request."
+                    )
+                else:
+                    # Documents exist but aren't processed
+                    doc_statuses = [doc.status for doc in all_documents]
+                    status_counts = {status: doc_statuses.count(status) for status in set(doc_statuses)}
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"No processed documents found in topic. Document statuses: {status_counts}. Please wait for document processing to complete, or provide content directly in the request."
+                    )
             
             generated_flashcards = await flashcard_generator.generate_flashcards_from_documents(
                 documents=documents,

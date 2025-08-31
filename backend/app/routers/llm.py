@@ -10,7 +10,7 @@ import json
 import httpx
 from datetime import datetime, timedelta
 
-from ..services.llm_service import LLMRequest, LLMResponse, LLMService, LLMProvider, llm_service
+from ..services.llm_service import LLMRequest, LLMResponse, LLMService, LLMProvider, ProviderHealth, llm_service
 from ..core.exceptions import (
     LLMError, RateLimitExceeded, InvalidAPIKey, ModelUnavailable, ContextWindowExceeded
 )
@@ -93,9 +93,12 @@ async def chat_completion(
         )
     
     try:
-        # Override provider if specified in the request
-        provider = request.provider.value if request.provider else None
-        service = LLMService(provider) if provider else llm_service
+        # Use the singleton service with fallback support
+        service = llm_service
+        
+        # If a specific provider is requested, try to switch to it temporarily
+        if request.provider:
+            await service.switch_provider(request.provider.value)
         
         # Format the prompt with system message if provided
         if request.system_prompt:
@@ -113,7 +116,7 @@ async def chat_completion(
             await track_llm_usage(
                 db=db,
                 user_id=current_user.id,
-                provider=service.provider,
+                provider=llm_response.provider,
                 model=llm_response.model,
                 prompt_tokens=llm_response.usage.get("prompt_tokens", 0),
                 completion_tokens=llm_response.usage.get("completion_tokens", 0),
@@ -123,7 +126,7 @@ async def chat_completion(
             logger.error(f"Failed to track LLM usage: {str(e)}", exc_info=True)
         
         # Add response headers
-        response.headers["X-LLM-Provider"] = service.provider
+        response.headers["X-LLM-Provider"] = llm_response.provider
         response.headers["X-LLM-Model"] = llm_response.model
         response.headers["X-Processing-Time"] = f"{processing_time:.4f}s"
         
@@ -244,5 +247,108 @@ async def chat_completion_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+@router.get("/providers/health")
+async def get_provider_health(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get health status for all configured LLM providers.
+    """
+    try:
+        health_status = await llm_service.get_all_provider_health()
+        available_providers = llm_service.get_available_providers()
+        
+        return {
+            "providers": health_status,
+            "available_providers": available_providers,
+            "fallback_chain": [p.provider for p in llm_service.fallback_chain],
+            "primary_provider": llm_service.primary_provider
+        }
+    except Exception as e:
+        logger.error(f"Error getting provider health: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve provider health status"
+        )
+
+@router.post("/providers/{provider}/validate")
+async def validate_provider_api_key(
+    provider: str,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Validate API key for a specific provider.
+    """
+    try:
+        is_valid = await llm_service.validate_api_key(provider)
+        health = await llm_service.check_provider_health(provider)
+        
+        return {
+            "provider": provider,
+            "is_valid": is_valid,
+            "health": health
+        }
+    except Exception as e:
+        logger.error(f"Error validating provider {provider}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate provider {provider}"
+        )
+
+@router.post("/providers/{provider}/switch")
+async def switch_provider(
+    provider: str,
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Switch to a different primary provider.
+    """
+    try:
+        success = await llm_service.switch_provider(provider)
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Successfully switched to provider: {provider}",
+                "primary_provider": llm_service.primary_provider,
+                "fallback_chain": [p.provider for p in llm_service.fallback_chain]
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to switch to provider {provider}. Provider may not be configured or API key is invalid."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error switching to provider {provider}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to switch to provider {provider}"
+        )
+
+@router.get("/providers/available")
+async def get_available_providers(
+    current_user: User = Depends(get_current_user)
+) -> Dict[str, Any]:
+    """
+    Get list of currently available providers (circuit breaker allows execution).
+    """
+    try:
+        available_providers = llm_service.get_available_providers()
+        all_providers = [p.provider for p in llm_service.providers]
+        
+        return {
+            "available_providers": available_providers,
+            "all_providers": all_providers,
+            "primary_provider": llm_service.primary_provider
+        }
+    except Exception as e:
+        logger.error(f"Error getting available providers: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve available providers"
+        )
 
 # Exception handlers are handled globally in main.py

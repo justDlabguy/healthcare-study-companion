@@ -215,10 +215,10 @@ export function QAInterface({ topicId, topicTitle, hasDocuments }: QAInterfacePr
   }
 
   return (
-    <Card className="flex flex-col h-[600px] sm:h-[700px]">
-      <CardHeader className="flex-shrink-0">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 min-w-0">
+    <Card className="flex flex-col h-[calc(100vh-200px)] min-h-[500px] max-h-[800px]">
+      <CardHeader className="flex-shrink-0 pb-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 min-w-0 text-base sm:text-lg">
             <MessageCircle className="h-5 w-5 flex-shrink-0" />
             <span className="truncate">Q&A: {topicTitle}</span>
           </CardTitle>
@@ -227,7 +227,7 @@ export function QAInterface({ topicId, topicTitle, hasDocuments }: QAInterfacePr
               onClick={clearAllHistory}
               variant="outline"
               size="sm"
-              className="text-red-600 hover:text-red-700 w-full sm:w-auto"
+              className="text-red-600 hover:text-red-700 w-full sm:w-auto mt-1 sm:mt-0"
             >
               Clear History
             </Button>
@@ -237,127 +237,132 @@ export function QAInterface({ topicId, topicTitle, hasDocuments }: QAInterfacePr
           <StatusMessage
             status="warning"
             message="Upload documents first to start asking questions"
+            className="mt-2"
           />
         )}
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-6">
+      <CardContent className="flex-1 flex flex-col p-4 sm:p-6 gap-4 overflow-hidden">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center py-8">
-              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Start a Conversation</h3>
-              <p className="text-gray-600">
-                {hasDocuments 
-                  ? 'Ask questions about your uploaded documents and get AI-powered answers.'
-                  : 'Upload documents first, then ask questions about their content.'
-                }
-              </p>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className="space-y-4">
-                {/* Question */}
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] sm:max-w-3xl bg-blue-600 text-white rounded-lg px-3 sm:px-4 py-3">
-                    <div className="flex items-start gap-2">
-                      <User className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium mb-1">You asked:</p>
-                        <p className="break-words">{message.question}</p>
+        <div className="flex-1 overflow-y-auto pr-1 -mr-2 sm:mr-0">
+          <div className="space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center py-8 px-2">
+                <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Start a Conversation</h3>
+                <p className="text-gray-600">
+                  {hasDocuments 
+                    ? 'Ask questions about your uploaded documents and get AI-powered answers.'
+                    : 'Upload documents first, then ask questions about their content.'
+                  }
+                </p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div key={message.id} className="space-y-3">
+                  {/* Question */}
+                  <div className="flex justify-end">
+                    <div className="max-w-[90%] sm:max-w-3xl bg-blue-600 text-white rounded-lg px-4 py-3">
+                      <div className="flex items-start gap-2">
+                        <User className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm mb-1">You asked:</p>
+                          <p className="break-words text-sm">{message.question}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Answer */}
-                <div className="flex justify-start">
-                  <div className="max-w-[85%] sm:max-w-3xl bg-gray-100 rounded-lg px-3 sm:px-4 py-3">
-                    <div className="flex items-start gap-2">
-                      <Bot className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="font-medium text-gray-900">AI Assistant</p>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              onClick={() => copyToClipboard(message.answer)}
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              onClick={() => deleteMessage(message.id)}
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 text-gray-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                  {/* Answer */}
+                  <div className="flex justify-start">
+                    <div className="max-w-[90%] sm:max-w-3xl bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                      <div className="flex items-start gap-2">
+                        <Bot className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="font-medium text-sm text-gray-900">AI Assistant</p>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Button
+                                onClick={() => copyToClipboard(message.answer)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-gray-500 hover:text-gray-700"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                onClick={() => deleteMessage(message.id)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-gray-500 hover:text-red-600"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="prose prose-sm max-w-none text-gray-800 mb-2 break-words">
+                            {message.answer}
+                          </div>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500">
+                            <span>{new Date(message.created_at).toLocaleString()}</span>
+                            {message.confidence && (
+                              <span>Confidence: {Math.round(message.confidence * 100)}%</span>
+                            )}
+                            {message.model && (
+                              <span>Model: {message.model}</span>
+                            )}
                           </div>
                         </div>
-                        <p className="text-gray-800 whitespace-pre-wrap mb-2 break-words">{message.answer}</p>
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-gray-500">
-                          <span>{new Date(message.created_at).toLocaleString()}</span>
-                          {message.confidence && (
-                            <span>Confidence: {Math.round(message.confidence * 100)}%</span>
-                          )}
-                          {message.model && (
-                            <span>Model: {message.model}</span>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
+              ))
+            )}
 
-          {/* Loading indicator */}
-          {isAsking && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] sm:max-w-3xl bg-gray-100 rounded-lg px-3 sm:px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <Bot className="h-4 w-4 text-blue-600" />
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                  <p className="text-gray-600">AI is analyzing your documents and generating an answer...</p>
+            {/* Loading indicator */}
+            {isAsking && (
+              <div className="flex justify-start">
+                <div className="max-w-[90%] sm:max-w-3xl bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-blue-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <p className="text-sm text-gray-600">AI is analyzing your documents and generating an answer...</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
+            )}
+          </div>
+          <div ref={messagesEndRef} className="h-4" />
         </div>
 
         {/* Question Input */}
-        <form onSubmit={handleAskQuestion} className="flex gap-2">
-          <Input
-            value={currentQuestion}
-            onChange={(e) => setCurrentQuestion(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder={hasDocuments ? "Ask a question about your documents..." : "Upload documents first to ask questions"}
-            disabled={isAsking || !hasDocuments}
-            className="flex-1 min-w-0"
-          />
-          <Button 
-            type="submit" 
-            disabled={!currentQuestion.trim() || isAsking || !hasDocuments}
-            className="px-3 flex-shrink-0"
-          >
-            {isAsking ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </form>
-
-        <p className="text-xs text-gray-500 mt-2 hidden sm:block">
-          Press Enter to send, Shift+Enter for new line
-        </p>
+        <div className="bg-background border-t pt-4">
+          <form onSubmit={handleAskQuestion} className="flex gap-2">
+            <Input
+              value={currentQuestion}
+              onChange={(e) => setCurrentQuestion(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={hasDocuments ? "Ask a question about your documents..." : "Upload documents first to ask questions"}
+              disabled={isAsking || !hasDocuments}
+              className="flex-1 min-w-0"
+            />
+            <Button 
+              type="submit" 
+              disabled={!currentQuestion.trim() || isAsking || !hasDocuments}
+              className="px-3 flex-shrink-0"
+            >
+              {isAsking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
+          <p className="text-xs text-muted-foreground mt-2 text-center sm:text-left">
+            Press Enter to send, Shift+Enter for new line
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

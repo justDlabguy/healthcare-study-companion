@@ -108,3 +108,5 @@ TOAST_FIXES.md
 # Test directories
 kiro_test_file/
 IDE_TESTS/
+
+.windsurf/

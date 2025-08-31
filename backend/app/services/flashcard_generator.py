@@ -133,7 +133,7 @@ Please generate flashcards that:
 2. Have clear, specific questions
 3. Provide comprehensive but concise answers
 4. Cover different aspects of the content
-5. Are suitable for medical/healthcare study
+5. Are suitable for  study
 
 Return the flashcards as a JSON array with this exact format:
 [
@@ -175,7 +175,7 @@ Please generate cloze flashcards that:
 2. Replace the most important word or phrase with [...]
 3. Provide the missing term/phrase as the answer
 4. Create meaningful learning opportunities
-5. Are suitable for medical/healthcare study
+5. Are suitable for  study
 
 Return the flashcards as a JSON array with this exact format:
 [
@@ -217,7 +217,7 @@ Please generate multiple choice flashcards that:
 2. Have clear, specific questions
 3. Provide 4 plausible answer choices
 4. Have one clearly correct answer
-5. Are suitable for medical/healthcare study
+5. Are suitable for study
 
 Return the flashcards as a JSON array with this exact format:
 [
